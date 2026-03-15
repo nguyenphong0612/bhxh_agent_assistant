@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+venv/
+.env
+
+# Vector database
+data/vector_db/
+
+# Uploaded documents
+data/laws/
+data/user_docs/
+
+# OS
+.DS_Store
+Thumbs.db

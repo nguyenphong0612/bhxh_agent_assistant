@@ -2,18 +2,53 @@
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.spec
 
 # Virtual environment
+.venv/
 venv/
 .env
 
-# Vector database
-data/vector_db/
+# Vector database (runtime data, mỗi máy tự build)
+Data/vector_db/
 
-# Uploaded documents
-data/laws/
-data/user_docs/
+# Uploaded documents (runtime)
+Data/law/
+Data/user_docs/
+
+# Feedback data (runtime)
+Data/feedback.json
+
+# Test data / sample docs (không cần trong repo)
+Data/*.docx
+Data/*.pdf
+
+# Installer files
+*.msi
+*.exe
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Sentence-transformers cache
+.cache/
+
+# Backup files
+*.pre_*
+*_legacy.py
+_peek_*.py
+
+# Test files (chỉ dùng local, không push)
+test_*.py

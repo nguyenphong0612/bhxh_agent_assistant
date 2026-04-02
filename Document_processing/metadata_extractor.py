@@ -1,14 +1,12 @@
 import json
 import re
-import requests
 from typing import Dict
 from Document_processing.splitter import TextSplitter
-from Config.setting import OLLAMA_URL, OLLAMA_MODEL
+
 
 class MetadataExtractor:
-    def __init__(self, model: str = OLLAMA_MODEL):
-        self.url = OLLAMA_URL
-        self.model = model
+    def __init__(self, model=None):
+        self._model = model
 
      # =====================================================
     # =============== DOCUMENT LEVEL =======================
@@ -368,28 +366,16 @@ Trả về JSON:
 """.strip()
 
     # =========================
-    # 2. CALL OLLAMA
+    # 2. CALL LLM
     # =========================
-    def _call_ollama(self, prompt: str) -> str:
-        response = requests.post(
-            self.url,
-            json={
-                "model": self.model,
-                "prompt": prompt,
-                "stream": False,
-                "temperature": 0
-            }
-        )
+    def _get_model(self):
+        if self._model is None:
+            from Config.model_provider import create_model
+            self._model = create_model()
+        return self._model
 
-        try:
-            data = response.json()
-        except Exception:
-            raise ValueError(f"❌ Không parse được response: {response.text}")
-
-        if "response" not in data:
-            raise ValueError(f"❌ Ollama error: {data}")
-
-        return data["response"]
+    def _call_llm(self, prompt: str) -> str:
+        return self._get_model().generate(prompt)
 
     # =========================
     # 3. EXTRACT JSON
@@ -435,7 +421,7 @@ Trả về JSON:
 
         for i in range(max_retry):
             try:
-                raw_output = self._call_ollama(prompt)
+                raw_output = self._call_llm(prompt)
                 data = self._extract_json(raw_output)
 
                 if data:

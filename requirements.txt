@@ -4,6 +4,5 @@ sentence-transformers
 pypandoc
 python-docx
 pdfplumber
-ollama
 tqdm
 requests

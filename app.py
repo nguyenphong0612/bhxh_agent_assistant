@@ -1,12 +1,12 @@
 import streamlit as st
-import ollama
 import json
 import tempfile
 import os
 from datetime import datetime
 from Core.workflow import LegalAgentWorkflow
 from Document_processing.loader import DocumentLoader
-from Config.setting import OLLAMA_MODEL, FEEDBACK_FILE
+from Config.setting import FEEDBACK_FILE
+from Config.model_provider import create_model
 
 def format_analysis(analysis):
     """Format analysis result (new schema) thành list dễ đọc."""
@@ -94,18 +94,8 @@ def save_feedback(data):
         json.dump(feedbacks, f, ensure_ascii=False, indent=2)
 
 
-# ---- Model wrapper
-class OllamaModel:
-    def generate(self, prompt):
-        response = ollama.generate(
-            model=OLLAMA_MODEL,
-            prompt=prompt
-        )
-        return response["response"]
-
-
 # ---- Init
-model = OllamaModel()
+model = create_model()
 workflow = LegalAgentWorkflow(model)
 doc_loader = DocumentLoader()
 

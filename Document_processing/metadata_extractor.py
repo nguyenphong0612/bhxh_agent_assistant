@@ -1,6 +1,6 @@
-import json
 import re
 from typing import Dict
+
 from Document_processing.splitter import TextSplitter
 
 
@@ -8,7 +8,7 @@ class MetadataExtractor:
     def __init__(self, model=None):
         self._model = model
 
-     # =====================================================
+    # =====================================================
     # =============== DOCUMENT LEVEL =======================
     # =====================================================
 
@@ -32,28 +32,28 @@ class MetadataExtractor:
                 "so_van_ban": doc_info["so_van_ban"],
                 "ngay_ban_hanh": doc_info["ngay_ban_hanh"],
                 "tieu_de": title,
-                "can_cu": can_cu
+                "can_cu": can_cu,
             },
             "clean_text": clean_text,
-            "body_text": body_text
+            "body_text": body_text,
         }
 
     def _strip_md_markers(self, text: str) -> str:
         """Strip markdown formatting markers for metadata extraction."""
         cleaned = []
-        for line in text.split('\n'):
-            line = re.sub(r'^>\s*', '', line)       # blockquote
-            line = re.sub(r'^#{1,6}\s*', '', line)  # heading
-            line = line.replace('*', '')              # bold/italic
+        for line in text.split("\n"):
+            line = re.sub(r"^>\s*", "", line)  # blockquote
+            line = re.sub(r"^#{1,6}\s*", "", line)  # heading
+            line = line.replace("*", "")  # bold/italic
             cleaned.append(line)
-        return '\n'.join(cleaned)
+        return "\n".join(cleaned)
 
     def _remove_quoc_hieu(self, text: str) -> str:
         return re.sub(
             r"\*{0,2}CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\*{0,2}.*?Hạnh phúc",
             "",
             text,
-            flags=re.IGNORECASE | re.DOTALL
+            flags=re.IGNORECASE | re.DOTALL,
         )
 
     def _normalized_lines(self, text: str, keep_empty: bool = False):
@@ -114,12 +114,12 @@ class MetadataExtractor:
         ngay = re.search(
             r"ngày\s+\d{1,2}\s+tháng\s+\d{1,2}\s+năm\s+\d{4}",
             text,
-            re.IGNORECASE
+            re.IGNORECASE,
         )
 
         return {
             "so_van_ban": so_van_ban,
-            "ngay_ban_hanh": ngay.group() if ngay else ""
+            "ngay_ban_hanh": ngay.group() if ngay else "",
         }
 
     def _extract_title(self, text: str) -> str:
@@ -259,27 +259,18 @@ class MetadataExtractor:
         return start_idx, end_idx
 
     def _strip_metadata_blocks(self, text: str) -> str:
-        """
-        Remove header metadata blocks.
-        
-        Strategy for markdown (from pypandoc):
-        1. Find first content heading (# with ilvl, not decorative like 'Độc lập...')
-        2. Everything before that heading is header → strip metadata from it
-        3. Return from first content heading onward as body_text
-        """
+        """Remove header metadata blocks and return body content."""
         raw_lines = text.split("\n")
-        lines = self._normalized_lines(text, keep_empty=True)
         if not raw_lines:
             return ""
 
         # For markdown: find first real content heading
-        # Skip decorative headings (quốc hiệu, empty headings)
-        skip_headings = {'độc lập - tự do - hạnh phúc', ''}
+        skip_headings = {"độc lập - tự do - hạnh phúc", ""}
         body_start_line_idx = len(raw_lines)
-        
+
         for idx, raw_line in enumerate(raw_lines):
-            if raw_line.startswith('#'):
-                htext = raw_line.lstrip('#').strip()
+            if raw_line.startswith("#"):
+                htext = raw_line.lstrip("#").strip()
                 if htext.lower() not in skip_headings:
                     body_start_line_idx = idx
                     break
@@ -296,10 +287,9 @@ class MetadataExtractor:
                         body_start_line_idx = idx
                         break
                     char_count = line_end_pos
-            except:
+            except Exception:
                 pass
 
-        # Body = everything from body_start_line_idx onward
         remaining = []
         for idx in range(body_start_line_idx, len(raw_lines)):
             raw_line = raw_lines[idx]
@@ -310,139 +300,20 @@ class MetadataExtractor:
         return "\n".join(remaining).strip()
 
     # =========================
-    # 1. PROMPT
-    # =========================
-    def _build_prompt(self, text: str) -> str:
-        return f"""
-Bạn là hệ thống trích xuất thông tin từ văn bản hành chính tiếng Việt.
-
-Nhiệm vụ:
-Trích xuất thông tin vào JSON theo schema:
-
-{{
-  "noi_dung": "mục tiêu hoặc hành động chính",
-  "so_luong": "các con số, tỷ lệ nếu có",
-  "thoi_gian_bat_dau": "dd/mm/yyyy nếu có thể",
-  "thoi_han": "thời lượng hoặc deadline",
-  "phu_trach": "đơn vị chịu trách nhiệm chính",
-  "kinh_phi": "nguồn hoặc mức kinh phí",
-  "luc_luong_phoi_hop": "đơn vị phối hợp",
-  "dia_diem": "nơi thực hiện"
-}}
-
-QUY TẮC BẮT BUỘC:
-- Chỉ lấy thông tin có trong văn bản
-- Không suy diễn
-- Không thêm thông tin ngoài văn bản
-- Nếu không có → ghi "không nói rõ"
-- Trả về JSON hợp lệ, KHÔNG giải thích
-
-------------------------
-VÍ DỤ:
-
-Input:
-"...từ ngày 1/4/2026 các cơ quan BHXH cấp xã tổ chức thực hiện, trong vòng 1 tháng phải tăng 10% đối tượng tự nguyện..."
-
-Output:
-{{
-  "noi_dung": "tăng số lượng đối tượng tham gia BHXH",
-  "so_luong": "10% tự nguyện",
-  "thoi_gian_bat_dau": "01/04/2026",
-  "thoi_han": "1 tháng",
-  "phu_trach": "cơ quan BHXH cấp xã",
-  "kinh_phi": "không nói rõ",
-  "luc_luong_phoi_hop": "không nói rõ",
-  "dia_diem": "không nói rõ"
-}}
-
-------------------------
-
-Văn bản:
-\"\"\"
-{text}
-\"\"\"
-
-Trả về JSON:
-""".strip()
-
-    # =========================
-    # 2. CALL LLM
-    # =========================
-    def _get_model(self):
-        if self._model is None:
-            from Config.model_provider import create_model
-            self._model = create_model()
-        return self._model
-
-    def _call_llm(self, prompt: str) -> str:
-        return self._get_model().generate(prompt)
-
-    # =========================
-    # 3. EXTRACT JSON
-    # =========================
-    def _extract_json(self, text: str):
-        try:
-            match = re.search(r"\{.*\}", text, re.DOTALL)
-            if match:
-                return json.loads(match.group())
-        except Exception:
-            return None
-        return None
-
-    # =========================
-    # 4. NORMALIZE
-    # =========================
-    def _normalize(self, data: dict) -> dict:
-        keys = [
-            "noi_dung",
-            "so_luong",
-            "thoi_gian_bat_dau",
-            "thoi_han",
-            "phu_trach",
-            "kinh_phi",
-            "luc_luong_phoi_hop",
-            "dia_diem"
-        ]
-
-        for k in keys:
-            if k not in data or not data[k]:
-                data[k] = "không nói rõ"
-
-        return data
-
-    # =========================
-    # 5. MAIN FUNCTION
+    # Legacy compatibility
     # =========================
     def extract(self, text: str, max_retry: int = 3) -> dict:
-    # 🔥 lấy metadata document-level trước
-        doc_meta = self.extract_document(text)["metadata"]
+        """Legacy API retained for compatibility.
 
-        prompt = self._build_prompt(text)
+        Pipeline chính dùng extract_document() + LLMAgent schema mới.
+        Hàm này không còn gọi prompt/LLM để tránh conflict schema cũ.
+        """
+        doc = self.extract_document(text)
+        meta = doc.get("metadata", {})
+        body_text = doc.get("body_text", "")
 
-        for i in range(max_retry):
-            try:
-                raw_output = self._call_llm(prompt)
-                data = self._extract_json(raw_output)
-
-                if data:
-                    data = self._normalize(data)
-
-                    # 🔥 merge vào đây
-                    data.update({
-                        "so_van_ban": doc_meta.get("so_van_ban", "không nói rõ"),
-                        "ngay_ban_hanh": doc_meta.get("ngay_ban_hanh", "không nói rõ"),
-                        "tieu_de": doc_meta.get("tieu_de", "không nói rõ"),
-                        "co_quan_ban_hanh": doc_meta.get("issuer", "không nói rõ"),
-                    })
-
-                    return data
-
-            except Exception as e:
-                print(f"⚠️ Extract lỗi lần {i+1}: {e}")
-
-        # fallback
         return {
-            "noi_dung": "không nói rõ",
+            "noi_dung": body_text[:300] if body_text else "không nói rõ",
             "so_luong": "không nói rõ",
             "thoi_gian_bat_dau": "không nói rõ",
             "thoi_han": "không nói rõ",
@@ -450,8 +321,8 @@ Trả về JSON:
             "kinh_phi": "không nói rõ",
             "luc_luong_phoi_hop": "không nói rõ",
             "dia_diem": "không nói rõ",
-            "so_van_ban": "không nói rõ",
-            "ngay_ban_hanh": "không nói rõ",
-            "tieu_de": "không nói rõ",
-            "co_quan_ban_hanh": "không nói rõ"
+            "so_van_ban": meta.get("so_van_ban", "không nói rõ") or "không nói rõ",
+            "ngay_ban_hanh": meta.get("ngay_ban_hanh", "không nói rõ") or "không nói rõ",
+            "tieu_de": meta.get("tieu_de", "không nói rõ") or "không nói rõ",
+            "co_quan_ban_hanh": meta.get("issuer", "không nói rõ") or "không nói rõ",
         }

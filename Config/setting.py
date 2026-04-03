@@ -7,18 +7,10 @@ import os
 # ── Đường dẫn gốc của project ──────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# ── LLM Provider: "gemini" | "groq" | "ollama" ─────────────────
-LLM_PROVIDER = "groq"
+# ── LLM Provider: "ollama" (offline, local) ──────────────────────
+LLM_PROVIDER = "ollama"
 
-# ── Gemini (online) ─────────────────────────────────────────────
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL = "gemini-2.0-flash"
-
-# ── Groq (online) ──────────────────────────────────────────────
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-GROQ_MODEL = "llama-3.1-8b-instant"
-
-# ── Ollama (local, fallback) ────────────────────────────────────
+# ── Ollama (local) ────────────────────────────────────────────────
 OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "qwen2.5:7b"
 

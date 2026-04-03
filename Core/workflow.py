@@ -240,7 +240,6 @@ class LegalAgentWorkflow:
         analysis = self.llm_agent.analyze_document(working_chunks, can_cu_text=can_cu_text)
 
         analysis_text = json.dumps(analysis, ensure_ascii=False, indent=2)
-
         can_cu_phap_ly = analysis.get("can_cu_phap_ly", [])
 
         query = " ; ".join(can_cu_phap_ly).strip()
@@ -252,30 +251,28 @@ class LegalAgentWorkflow:
 
         context = self.rag_engine.retrieve_context(query)
 
+        suggestions = {
+            "can_cu_phap_ly": can_cu_phap_ly,
+            "khuyen_nghi": []
+        }
+
         if context:
             suggestion_prompt = PromptManager.build_suggestion_prompt(
                 analysis_text,
                 context
             )
             raw_output = self.llm_agent.generate(suggestion_prompt)
-
             try:
                 json_str = re.search(r"\{.*\}", raw_output, re.DOTALL).group()
-                suggestions = json.loads(json_str)
+                parsed = json.loads(json_str)
+                if isinstance(parsed, dict):
+                    suggestions["can_cu_phap_ly"] = parsed.get("can_cu_phap_ly", suggestions["can_cu_phap_ly"])
+                    suggestions["khuyen_nghi"] = parsed.get("khuyen_nghi", [])
             except Exception:
-                suggestions = {
-                    "raw_text": raw_output
-                }
-        else:
-            suggestions = {
-                "can_cu_phap_ly": can_cu_phap_ly,
-                "risks": [],
-                "recommendations": []
-            }
+                pass
 
-        # Human-readable summary
-        summary_prompt = PromptManager.build_readable_summary_prompt(analysis)
-        readable_summary = self.llm_agent.generate(summary_prompt)
+        # Reuse summary already synthesized in llm_agent to avoid duplicate prompt path
+        readable_summary = analysis.get("tom_tat", "")
 
         return {
             "analysis": analysis,

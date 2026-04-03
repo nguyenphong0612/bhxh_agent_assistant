@@ -8,78 +8,94 @@ from Document_processing.loader import DocumentLoader
 from Config.setting import FEEDBACK_FILE
 from Config.model_provider import create_model
 
-def format_analysis(analysis):
-    """Format analysis result (new schema) thành list dễ đọc."""
-    lines = []
-    idx = 1
 
-    # Nhiệm vụ
-    nhiem_vu = analysis.get("nhiem_vu", [])
-    if nhiem_vu:
-        lines.append(f"{idx}. Nhiệm vụ các đơn vị:")
-        idx += 1
-        for t in nhiem_vu:
-            don_vi = t.get("don_vi", "?")
-            vai_tro = t.get("vai_tro", "")
-            noi_dung = t.get("noi_dung", "")
-            line = f"   - {don_vi}"
-            if vai_tro:
-                line += f" ({vai_tro})"
-            if noi_dung:
-                line += f": {noi_dung}"
-            lines.append(line)
-
-    # Quy trình thực hiện
-    quy_trinh = analysis.get("quy_trinh", [])
-    if quy_trinh:
-        lines.append(f"{idx}. Quy trình thực hiện:")
-        idx += 1
-        for step in quy_trinh:
-            b = step.get("buoc", "?")
-            hd = step.get("hanh_dong", "")
-            dv = step.get("don_vi", "")
-            line = f"   **Bước {b}**: {hd}"
-            if dv:
-                line += f" — *{dv}*"
-            lines.append(line)
-
-    # Thời gian
-    thoi_gian = analysis.get("thoi_gian", "không nói rõ")
-    if thoi_gian and thoi_gian != "không nói rõ":
-        lines.append(f"{idx}. Thời gian: {thoi_gian}")
-        idx += 1
-
-    # Kinh phí
-    kinh_phi = analysis.get("kinh_phi", "không nói rõ")
-    if kinh_phi and kinh_phi != "không nói rõ":
-        lines.append(f"{idx}. Kinh phí: {kinh_phi}")
-        idx += 1
-
-    # Địa điểm
-    dia_diem = analysis.get("dia_diem", "không nói rõ")
-    if dia_diem and dia_diem != "không nói rõ":
-        lines.append(f"{idx}. Địa điểm: {dia_diem}")
-        idx += 1
-
-    # Căn cứ pháp lý
-    can_cu = analysis.get("can_cu_phap_ly", [])
-    if can_cu:
-        lines.append(f"{idx}. Căn cứ pháp lý: {', '.join(can_cu)}")
-        idx += 1
-
-    # Lưu ý
-    luu_y = analysis.get("luu_y", "")
-    if luu_y and luu_y != "không có":
-        lines.append(f"{idx}. Lưu ý: {luu_y}")
-        idx += 1
-
-    # Tóm tắt
-    tom_tat = analysis.get("tom_tat", "")
+def _render_main_summary(analysis):
+    """Render mục 1: tóm tắt ngắn gọn cho người dùng."""
+    tom_tat = (analysis or {}).get("tom_tat", "")
     if tom_tat:
-        lines.append(f"{idx}. Tóm tắt: {tom_tat}")
-        idx += 1
+        st.markdown(tom_tat)
+    else:
+        st.info("Chưa có tóm tắt.")
 
-    return "\n".join(lines)
+
+def _render_process_steps(analysis):
+    """Render mục 2: quy trình các bước thực hiện."""
+    quy_trinh = (analysis or {}).get("quy_trinh", [])
+    if not quy_trinh:
+        st.info("Chưa trích xuất được quy trình.")
+        return
+
+    for step in quy_trinh:
+        buoc = step.get("buoc", "?")
+        hanh_dong = step.get("hanh_dong", "")
+        don_vi = step.get("don_vi", "")
+
+        if don_vi:
+            st.markdown(f"**Bước {buoc}.** {hanh_dong}  ")
+            st.caption(f"Đơn vị: {don_vi}")
+        else:
+            st.markdown(f"**Bước {buoc}.** {hanh_dong}")
+
+
+def _render_related_info(result):
+    """Render mục 3: thông tin liên quan (thu gọn để đỡ rối mắt)."""
+    analysis = result.get("analysis", {}) if isinstance(result, dict) else {}
+    doc_meta = result.get("document_metadata", {}) if isinstance(result, dict) else {}
+    suggestions = result.get("suggestions", {}) if isinstance(result, dict) else {}
+
+    with st.expander("Mở thông tin liên quan"):
+        # Thông tin văn bản
+        if doc_meta:
+            st.markdown("**Thông tin văn bản**")
+            for k, v in doc_meta.items():
+                if v:
+                    st.write(f"- {k}: {v}")
+
+        # Nhiệm vụ
+        nhiem_vu = analysis.get("nhiem_vu", [])
+        if nhiem_vu:
+            st.markdown("**Nhiệm vụ các đơn vị**")
+            for task in nhiem_vu:
+                don_vi = task.get("don_vi", "?")
+                vai_tro = task.get("vai_tro", "")
+                noi_dung = task.get("noi_dung", "")
+                line = f"- {don_vi}"
+                if vai_tro:
+                    line += f" ({vai_tro})"
+                if noi_dung:
+                    line += f": {noi_dung}"
+                st.write(line)
+
+        # Các trường thông tin còn lại
+        for label, key in [
+            ("Thời gian", "thoi_gian"),
+            ("Kinh phí", "kinh_phi"),
+            ("Địa điểm", "dia_diem"),
+            ("Lưu ý", "luu_y"),
+        ]:
+            value = analysis.get(key)
+            if value and value not in ["không nói rõ", "không có"]:
+                st.write(f"- {label}: {value}")
+
+        can_cu = analysis.get("can_cu_phap_ly", [])
+        if can_cu:
+            st.markdown("**Căn cứ pháp lý (phân tích)**")
+            for item in can_cu:
+                st.write(f"- {item}")
+
+        # Đề xuất tham khảo
+        khuyen_nghi = suggestions.get("khuyen_nghi", [])
+        can_cu_goi_y = suggestions.get("can_cu_phap_ly", [])
+        if khuyen_nghi or can_cu_goi_y:
+            st.markdown("**Đề xuất tham khảo**")
+            if can_cu_goi_y:
+                st.markdown("Căn cứ pháp lý:")
+                for item in can_cu_goi_y:
+                    st.write(f"- {item}")
+            if khuyen_nghi:
+                st.markdown("Khuyến nghị:")
+                for item in khuyen_nghi:
+                    st.write(f"- {item}")
 
 def save_feedback(data):
     try:
@@ -189,25 +205,16 @@ with tab2:
         if st.button("Phân tích"):
             result = workflow.analyze_user_document(text)
 
-            st.subheader("� Thông tin văn bản")
-            doc_meta = result.get("document_metadata", {})
-            if doc_meta:
-                for k, v in doc_meta.items():
-                    if v and k != "can_cu":
-                        st.write(f"**{k}:** {v}")
+            analysis = result.get("analysis", {})
 
-            st.subheader("📝 Phân tích (Dễ đọc)")
-            formatted = format_analysis(result["analysis"])
-            if formatted:
-                st.markdown(formatted)
-            else:
-                st.code(result.get("analysis_readable", "Không có"), language="text")
+            st.subheader("1) Tóm tắt")
+            _render_main_summary(analysis)
 
-            st.subheader("📄 Phân tích (JSON)")
-            st.json(result["analysis"])
+            st.subheader("2) Quy trình các bước thực hiện")
+            _render_process_steps(analysis)
 
-            st.subheader("⚠️ Đề xuất & Rủi ro")
-            st.json(result["suggestions"])
+            st.subheader("3) Các thông tin liên quan")
+            _render_related_info(result)
     
 # ==============================
 # TAB 3 — Ingest Document
@@ -281,7 +288,8 @@ with tab3:
             elif result["status"] == "empty":
                 st.error("Không tách được chunk nào từ văn bản.")
             else:
-                st.json(result)
+                st.error("Có lỗi khi nạp dữ liệu. Vui lòng thử lại.")
+                st.caption(str(result))
 
 # ==============================
 # TAB 4 — Feedback Logs
@@ -291,6 +299,16 @@ with tab4:
     try:
         with open(FEEDBACK_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-            st.json(data)
+            if not data:
+                st.write("Chưa có feedback")
+            else:
+                for i, item in enumerate(reversed(data), start=1):
+                    q = item.get("question", "")
+                    a = item.get("answer", "")
+                    fb = item.get("feedback", "")
+                    t = item.get("time", "")
+                    with st.expander(f"#{i} - {fb} - {t}"):
+                        st.markdown(f"**Câu hỏi:** {q}")
+                        st.markdown(f"**Trả lời:** {a}")
     except:
         st.write("Chưa có feedback")
